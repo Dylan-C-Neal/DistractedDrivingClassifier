@@ -1,3 +1,4 @@
 .ipynb_checkpoints/
 data/raw/*
 *.tmp
+notebooks/weights.hdf5
