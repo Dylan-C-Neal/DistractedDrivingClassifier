@@ -94,3 +94,85 @@ def cvmodeleval(model,
                            'validation_accuracy': validation_accuracies})
 
     return dftemp
+
+
+def sampleCV(model,
+             data,
+             isampled=3,
+             samples=80,
+             col1='subject',
+             col2='classname',
+             itercol='subject',
+             n_iterations=1,
+             epochs=1,
+             steps_per_epoch=None,
+             validation_steps=None,
+             target_size=(227, 227)):
+    """
+    Combine trainsampling and cvmodeleval functions so that the training data can be resampled numerous times
+    and run through cvmodeleval, to get a better representation of the model's performance.
+    """
+
+    for k in range(isampled):
+
+        # Save and print out iteration info
+        fullit = str(k + 1)
+        print('Resample iteration ' + fullit)
+
+        # Perform training sampling
+        ts = trainsampling(data=data, samples=samples, col1=col1, col2=col2)
+
+        # Save input model as separate variable, so that learned model parameter weights don't get logged for next
+        # iteration
+        modelsave = model
+
+        # Run CV model evaluation
+        stats = cvmodeleval(model=modelsave, data=ts, itercol=itercol, n_iterations=n_iterations, epochs=epochs,
+                            steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, target_size=target_size)
+
+        if k == 0:
+            combinedstats = stats
+
+            combinedstats.rename(columns={'validation_accuracy': 'val_acc1'}, inplace=True)
+
+        else:
+            combinedstats['val_acc' + fullit] = stats['validation_accuracy']
+
+    return combinedstats
+
+
+def trainsampling(data,
+                  samples=80,
+                  col1='subject',
+                  col2='classname'):
+    """
+    Function iterates through all unique combinations of two columns of a dataframe and pulls random samples for
+    each combination equal to the number called in the 'samples' argument. Function will sample with replacement
+    if the total number of rows per combination is less than the 'samples' argument. Samples will be returned
+    as a pandas DataFrame.
+    """
+
+    # Raise error if selected columns are numeric
+    if pd.api.types.is_numeric_dtype(data[col1]) or pd.api.types.is_numeric_dtype(data[col2]):
+        raise TypeError('Columns must not be numeric')
+
+    # Create empty dataframe
+    dftemp = pd.DataFrame(columns=data.columns)
+
+    # Assign list variables for unique values in each column
+    col1ls = data.loc[:, col1].unique()
+    col2ls = data.loc[:, col2].unique()
+
+    # For loops to filter all combinations of the two columns and sample accordingly
+    for i in col1ls:
+        for j in col2ls:
+            subset = data.loc[data.loc[:, col1] == i]
+            subset = subset.loc[subset.loc[:, col2] == j]
+
+            if len(subset) < samples:
+                dftemp = pd.concat([dftemp, subset.sample(samples, replace=True)])
+
+            else:
+                dftemp = pd.concat([dftemp, subset.sample(samples, replace=False)])
+
+    return dftemp
