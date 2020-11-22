@@ -1,7 +1,7 @@
 import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras.callbacks import ModelCheckpoint
+from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 
 
 def cvmodeleval(model,
@@ -46,7 +46,9 @@ def cvmodeleval(model,
                                  monitor='val_accuracy',
                                  save_best_only=True)
 
-    callbacks_list = [checkpoint]
+    earlystop = EarlyStopping(monitor='val_accuracy', min_delta=0.05, patience=3)
+
+    callbacks_list = [checkpoint, earlystop]
 
     # n_iteration for loop
     for i in range(n_iterations):
@@ -102,18 +104,19 @@ def cvmodeleval(model,
     return dftemp
 
 
-def sampleCV(model,
+def samplecv(model,
              data,
-             isampled=3,
+             isampled=1,
              samples=80,
              col1='subject',
              col2='classname',
              itercol='subject',
              n_iterations=1,
-             epochs=1,
+             epochs=3,
              steps_per_epoch=None,
              validation_steps=None,
-             target_size=(227, 227)):
+             target_size=(227, 227),
+             random_state=None):
     """
     Combine trainsampling and cvmodeleval functions so that the training data can be resampled numerous times
     and run through cvmodeleval, to get a better representation of the model's performance.
@@ -128,7 +131,7 @@ def sampleCV(model,
         print('Resample iteration ' + fullit)
 
         # Perform training sampling
-        ts = trainsampling(data=data, samples=samples, col1=col1, col2=col2)
+        ts = trainsampling(data=data, samples=samples, col1=col1, col2=col2, random_state=random_state)
 
 
         # Run CV model evaluation
@@ -149,7 +152,8 @@ def sampleCV(model,
 def trainsampling(data,
                   samples=80,
                   col1='subject',
-                  col2='classname'):
+                  col2='classname',
+                  random_state=None):
     """
     Function iterates through all unique combinations of two columns of a dataframe and pulls random samples for
     each combination equal to the number called in the 'samples' argument. Function will sample with replacement
@@ -175,9 +179,9 @@ def trainsampling(data,
             subset = subset.loc[subset.loc[:, col2] == j]
 
             if len(subset) < samples:
-                dftemp = pd.concat([dftemp, subset.sample(samples, replace=True)])
+                dftemp = pd.concat([dftemp, subset.sample(samples, replace=True, random_state=random_state)])
 
             else:
-                dftemp = pd.concat([dftemp, subset.sample(samples, replace=False)])
+                dftemp = pd.concat([dftemp, subset.sample(samples, replace=False, random_state=random_state)])
 
     return dftemp
