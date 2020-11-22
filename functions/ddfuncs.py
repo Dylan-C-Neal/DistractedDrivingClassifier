@@ -1,3 +1,9 @@
+import pandas as pd
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras.callbacks import ModelCheckpoint
+
+
 def cvmodeleval(model,
                 data,
                 itercol='subject',
@@ -29,7 +35,7 @@ def cvmodeleval(model,
     validation_accuracies = []
 
     # Save initial default model weights
-    Wsave = model.get_weights()
+    wsave = model.get_weights()
 
     # Instantiate image data generator
     datagen = keras.preprocessing.image.ImageDataGenerator()
@@ -57,7 +63,7 @@ def cvmodeleval(model,
             print('Substep ' + str(counter) + ' of ' + str(len(data[itercol].unique())))
 
             # reset model states for fresh training
-            model.set_weights(Wsave)
+            model.set_weights(wsave)
 
             # Split train and test sets, iterating through each subject to be excluded from training
             cvtrain = data.loc[data.loc[:, 'subject'] != j]
@@ -113,6 +119,8 @@ def sampleCV(model,
     and run through cvmodeleval, to get a better representation of the model's performance.
     """
 
+    modelsave = model
+
     for k in range(isampled):
 
         # Save and print out iteration info
@@ -122,9 +130,6 @@ def sampleCV(model,
         # Perform training sampling
         ts = trainsampling(data=data, samples=samples, col1=col1, col2=col2)
 
-        # Save input model as separate variable, so that learned model parameter weights don't get logged for next
-        # iteration
-        modelsave = model
 
         # Run CV model evaluation
         stats = cvmodeleval(model=modelsave, data=ts, itercol=itercol, n_iterations=n_iterations, epochs=epochs,
