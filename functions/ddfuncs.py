@@ -1,5 +1,4 @@
 import pandas as pd
-import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
 
@@ -9,9 +8,12 @@ def cvmodeleval(model,
                 itercol='subject',
                 n_iterations=1,
                 epochs=1,
+                batch_size=32,
                 steps_per_epoch=None,
                 validation_steps=None,
-                target_size=(227, 227)):
+                target_size=(227, 227),
+                random_state=None,
+                patience=3):
     """
     Define function to perform cross-validation on a model. Function will split the data into training and validation
     sets by each unique value in the itercol. In this case the itercol represents unique subjects present in each
@@ -46,7 +48,7 @@ def cvmodeleval(model,
                                  monitor='val_accuracy',
                                  save_best_only=True)
 
-    earlystop = EarlyStopping(monitor='val_accuracy', min_delta=0.05, patience=3)
+    earlystop = EarlyStopping(monitor='val_loss', min_delta=0, patience=patience)
 
     callbacks_list = [checkpoint, earlystop]
 
@@ -75,12 +77,15 @@ def cvmodeleval(model,
             train = datagen.flow_from_dataframe(cvtrain,
                                                 x_col='imgpath',
                                                 y_col='classname',
-                                                target_size=target_size)
+                                                batch_size=batch_size,
+                                                target_size=target_size,
+                                                seed=random_state)
             # Split validation data
             val = datagen.flow_from_dataframe(cvtest,
                                               x_col='imgpath',
                                               y_col='classname',
-                                              target_size=target_size)
+                                              target_size=target_size,
+                                              seed=random_state)
             # Fit model
             model.fit(train,
                       epochs=epochs,
@@ -93,9 +98,6 @@ def cvmodeleval(model,
             iterations.append(i + 1)
             validation_subjects.append(j)
             validation_accuracies.append(round(max(model.history.history['val_accuracy']), 3))
-
-            # Clear tf backend
-            tf.keras.backend.clear_session()
 
     # Fill dataframe with stats
     dftemp = pd.DataFrame({'iteration': iterations, 'validation_subject': validation_subjects,
@@ -113,10 +115,12 @@ def samplecv(model,
              itercol='subject',
              n_iterations=1,
              epochs=3,
+             batch_size=32,
              steps_per_epoch=None,
              validation_steps=None,
              target_size=(227, 227),
-             random_state=None):
+             random_state=None,
+             patience=3):
     """
     Combine trainsampling and cvmodeleval functions so that the training data can be resampled numerous times
     and run through cvmodeleval, to get a better representation of the model's performance.
@@ -133,10 +137,10 @@ def samplecv(model,
         # Perform training sampling
         ts = trainsampling(data=data, samples=samples, col1=col1, col2=col2, random_state=random_state)
 
-
         # Run CV model evaluation
         stats = cvmodeleval(model=modelsave, data=ts, itercol=itercol, n_iterations=n_iterations, epochs=epochs,
-                            steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, target_size=target_size)
+                            batch_size=batch_size, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps,
+                            target_size=target_size, random_state=random_state, patience=patience)
 
         if k == 0:
             combinedstats = stats
@@ -144,6 +148,7 @@ def samplecv(model,
             combinedstats.rename(columns={'validation_accuracy': 'val_acc1'}, inplace=True)
 
         else:
+            # noinspection PyUnboundLocalVariable
             combinedstats['val_acc' + fullit] = stats['validation_accuracy']
 
     return combinedstats
