@@ -48,7 +48,7 @@ def cvmodeleval(model,
                                  monitor='val_accuracy',
                                  save_best_only=True)
 
-    earlystop = EarlyStopping(monitor='val_loss', min_delta=0, patience=patience)
+    earlystop = EarlyStopping(monitor='val_accuracy', min_delta=0, patience=patience)
 
     callbacks_list = [checkpoint, earlystop]
 
