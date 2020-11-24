@@ -1,6 +1,7 @@
 import pandas as pd
 from tensorflow import keras
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
+import numpy as np
 
 
 def cvmodeleval(model,
@@ -70,8 +71,8 @@ def cvmodeleval(model,
             model.set_weights(wsave)
 
             # Split train and test sets, iterating through each subject to be excluded from training
-            cvtrain = data.loc[data.loc[:, 'subject'] != j]
-            cvtest = data.loc[data.loc[:, 'subject'] == j]
+            cvtrain = data.loc[data.loc[:, itercol] != j]
+            cvtest = data.loc[data.loc[:, itercol] == j]
 
             # Split training data
             train = datagen.flow_from_dataframe(cvtrain,
@@ -188,5 +189,111 @@ def trainsampling(data,
 
             else:
                 dftemp = pd.concat([dftemp, subset.sample(samples, replace=False, random_state=random_state)])
+
+    return dftemp
+
+
+def cvrand(model,
+           data,
+           itercol='subject',
+           n_iterations=3,
+           val_samples=3,
+           epochs=1,
+           batch_size=32,
+           steps_per_epoch=None,
+           validation_steps=None,
+           target_size=(227, 227),
+           random_state=None,
+           patience=3):
+    """
+    Define function to perform cross-validation on a model. Function will split the data into training and validation
+    sets by each unique value in the itercol. In this case the itercol represents unique subjects present in each
+    photo. The goal is to build a model that generalizes well to all subjects, and doesn't just remember the specific
+    subjects present in the training set.
+
+    The model will be reset to default parameter weights each iteration and will be fit to the cross-validation data.
+    The maximum validation_accuracy achieved during each round of fitting will be logged into a pandas DataFrame.
+
+    n_iterations represents the total number of times the full iteration loop will run, thus allowing multiple
+    data points to be collected for each unique value in the itercol.
+    """
+
+    # Raise error if selected columns are numeric
+    if pd.api.types.is_numeric_dtype(data[itercol]):
+        raise TypeError('Columns must not be numeric')
+
+    # Create empty lists
+    iterations = []
+    validation_accuracies = []
+
+    # Save initial default model weights
+    wsave = model.get_weights()
+
+    # Instantiate image data generator
+    datagen = keras.preprocessing.image.ImageDataGenerator()
+
+    # Designate model checkpoint and callbacks_list
+    checkpoint = ModelCheckpoint('weights.hdf5',
+                                 mode='max',
+                                 monitor='val_accuracy',
+                                 save_best_only=True)
+
+    earlystop = EarlyStopping(monitor='val_accuracy', min_delta=0, patience=patience)
+
+    callbacks_list = [checkpoint, earlystop]
+
+    # Initialize iteration counter
+    counter = 0
+
+    # Pull unique values from itercol
+    valuelist = data[itercol].unique()
+
+    # n_iteration for loop
+    for i in range(n_iterations):
+        # Substep counter
+        counter += 1
+
+        # Print iteration and substep progress
+        print('CV iteration ' + str(i + 1))
+        print('Substep ' + str(counter) + ' of ' + str(n_iterations + 1))
+
+        # reset model states for fresh training
+        model.set_weights(wsave)
+
+        # Sample the validation values
+        sampledvalues = np.random.choice(valuelist, size=val_samples, replace=False)
+
+        # Split train and test sets, iterating through each subject to be excluded from training
+        cvtest = data[data[itercol].isin(sampledvalues)]
+        cvtrain = data[~data[itercol].isin(sampledvalues)]
+
+        # Split training data
+        train = datagen.flow_from_dataframe(cvtrain,
+                                            x_col='imgpath',
+                                            y_col='classname',
+                                            batch_size=batch_size,
+                                            target_size=target_size,
+                                            seed=random_state)
+        # Split validation data
+        val = datagen.flow_from_dataframe(cvtest,
+                                          x_col='imgpath',
+                                          y_col='classname',
+                                          target_size=target_size,
+                                          seed=random_state)
+        # Fit model
+        model.fit(train,
+                  epochs=epochs,
+                  steps_per_epoch=steps_per_epoch,
+                  validation_data=val,
+                  validation_steps=validation_steps,
+                  callbacks=callbacks_list)
+
+        # Append lists
+        iterations.append(i + 1)
+        validation_accuracies.append(round(max(model.history.history['val_accuracy']), 3))
+
+    # Fill dataframe with stats
+    dftemp = pd.DataFrame({'iteration': iterations,
+                           'validation_accuracy': validation_accuracies})
 
     return dftemp
