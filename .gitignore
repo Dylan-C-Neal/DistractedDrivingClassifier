@@ -4,3 +4,4 @@ data/raw/imgs/
 *weights.hdf5
 .idea/
 notebooks/Experimentation.ipynb
+functions/__pychache__/
