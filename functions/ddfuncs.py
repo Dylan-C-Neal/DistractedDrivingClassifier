@@ -197,34 +197,38 @@ def cvrand(model,
            data,
            itercol='subject',
            n_iterations=3,
-           val_samples=3,
+           val_subjects=3,
            epochs=1,
            batch_size=32,
            steps_per_epoch=None,
            validation_steps=None,
            target_size=(227, 227),
            random_state=None,
+           min_delta=0,
            patience=3):
     """
     Define function to perform cross-validation on a model. Function will split the data into training and validation
-    sets by each unique value in the itercol. In this case the itercol represents unique subjects present in each
-    photo. The goal is to build a model that generalizes well to all subjects, and doesn't just remember the specific
-    subjects present in the training set.
+    sets by randomly selecting a defined number of validation_subjects (without replacement) and putting their data
+    in the validation set for that iteration. The goal is to build a model that generalizes well to all subjects,
+    and doesn't just remember the specific subjects present in the training set.
 
     The model will be reset to default parameter weights each iteration and will be fit to the cross-validation data.
-    The maximum validation_accuracy achieved during each round of fitting will be logged into a pandas DataFrame.
-
-    n_iterations represents the total number of times the full iteration loop will run, thus allowing multiple
-    data points to be collected for each unique value in the itercol.
+    The maximum validation_accuracy achieved (as well as the associated training accuracy during that specific epoch)
+    from each iteration of fitting will be logged into a pandas DataFrame.
     """
 
     # Raise error if selected columns are numeric
     if pd.api.types.is_numeric_dtype(data[itercol]):
         raise TypeError('Columns must not be numeric')
 
+    # set random seed
+    np.random.seed(random_state)
+
     # Create empty lists
     iterations = []
+    sampledvalues = []
     validation_accuracies = []
+    train_accuracies = []
 
     # Save initial default model weights
     wsave = model.get_weights()
@@ -238,7 +242,7 @@ def cvrand(model,
                                  monitor='val_accuracy',
                                  save_best_only=True)
 
-    earlystop = EarlyStopping(monitor='val_accuracy', min_delta=0, patience=patience)
+    earlystop = EarlyStopping(monitor='val_accuracy', min_delta=min_delta, patience=patience)
 
     callbacks_list = [checkpoint, earlystop]
 
@@ -248,24 +252,27 @@ def cvrand(model,
     # Pull unique values from itercol
     valuelist = data[itercol].unique()
 
+
+    for i in range(n_iterations):
+        sampledvalues.append(np.random.choice(valuelist, size=val_subjects, replace=False))
+
     # n_iteration for loop
     for i in range(n_iterations):
         # Substep counter
         counter += 1
 
         # Print iteration and substep progress
-        print('CV iteration ' + str(i + 1))
-        print('Substep ' + str(counter) + ' of ' + str(n_iterations + 1))
+        print('CV iteration ' + str(counter) + ' of ' + str(n_iterations))
 
         # reset model states for fresh training
         model.set_weights(wsave)
 
         # Sample the validation values
-        sampledvalues = np.random.choice(valuelist, size=val_samples, replace=False)
+        print('Validation subjects are ' + str(sampledvalues[i]))
 
         # Split train and test sets, iterating through each subject to be excluded from training
-        cvtest = data[data[itercol].isin(sampledvalues)]
-        cvtrain = data[~data[itercol].isin(sampledvalues)]
+        cvtest = data[data[itercol].isin(sampledvalues[i])]
+        cvtrain = data[~data[itercol].isin(sampledvalues[i])]
 
         # Split training data
         train = datagen.flow_from_dataframe(cvtrain,
@@ -290,10 +297,15 @@ def cvrand(model,
 
         # Append lists
         iterations.append(i + 1)
-        validation_accuracies.append(round(max(model.history.history['val_accuracy']), 3))
+        valmax = max(model.history.history['val_accuracy'])
+        valmaxindex = model.history.history['val_accuracy'].index(valmax)
+        validation_accuracies.append(round(valmax, 3))
+        train_accuracies.append(round(model.history.history['accuracy'][valmaxindex]))
 
     # Fill dataframe with stats
     dftemp = pd.DataFrame({'iteration': iterations,
+                           'sampledvalues': sampledvalues,
+                           'train_accuracies': train_accuracies,
                            'validation_accuracy': validation_accuracies})
 
     return dftemp
