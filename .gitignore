@@ -1,5 +1,5 @@
 .ipynb_checkpoints/
-data/raw/imgs/git 
+data/raw/imgs/git
 *.tmp
 *weights.hdf5
 .idea/
