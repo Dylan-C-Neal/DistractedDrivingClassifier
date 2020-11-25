@@ -225,7 +225,6 @@ def cvrand(model,
     np.random.seed(random_state)
 
     # Create empty lists
-    iterations = []
     sampledvalues = []
     validation_accuracies = []
     train_accuracies = []
@@ -251,7 +250,6 @@ def cvrand(model,
 
     # Pull unique values from itercol
     valuelist = data[itercol].unique()
-
 
     for i in range(n_iterations):
         sampledvalues.append(np.random.choice(valuelist, size=val_subjects, replace=False))
@@ -296,15 +294,13 @@ def cvrand(model,
                   callbacks=callbacks_list)
 
         # Append lists
-        iterations.append(i + 1)
         valmax = max(model.history.history['val_accuracy'])
         valmaxindex = model.history.history['val_accuracy'].index(valmax)
         validation_accuracies.append(round(valmax, 3))
-        train_accuracies.append(round(model.history.history['accuracy'][valmaxindex]))
+        train_accuracies.append(round(model.history.history['accuracy'][valmaxindex], 3))
 
     # Fill dataframe with stats
-    dftemp = pd.DataFrame({'iteration': iterations,
-                           'sampledvalues': sampledvalues,
+    dftemp = pd.DataFrame({'validation_subjects': sampledvalues,
                            'train_accuracies': train_accuracies,
                            'validation_accuracy': validation_accuracies})
 
