@@ -3,3 +3,4 @@ data/raw/imgs/
 *.tmp
 *weights.hdf5
 .idea/
+notebooks/Experimentation.ipynb
