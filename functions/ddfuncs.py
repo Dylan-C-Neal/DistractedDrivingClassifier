@@ -195,6 +195,8 @@ def trainsampling(data,
 
 def cvrand(model,
            data,
+           traindatagen,
+           testdatagen,
            itercol='subject',
            n_iterations=3,
            val_subjects=3,
@@ -231,9 +233,6 @@ def cvrand(model,
 
     # Save initial default model weights
     wsave = model.get_weights()
-
-    # Instantiate image data generator
-    datagen = keras.preprocessing.image.ImageDataGenerator()
 
     # Designate model checkpoint and callbacks_list
     checkpoint = ModelCheckpoint('weights.hdf5',
@@ -273,18 +272,18 @@ def cvrand(model,
         cvtrain = data[~data[itercol].isin(sampledvalues[i])]
 
         # Split training data
-        train = datagen.flow_from_dataframe(cvtrain,
-                                            x_col='imgpath',
-                                            y_col='classname',
-                                            batch_size=batch_size,
-                                            target_size=target_size,
-                                            seed=random_state)
+        train = traindatagen.flow_from_dataframe(cvtrain,
+                                                 x_col='imgpath',
+                                                 y_col='classname',
+                                                 batch_size=batch_size,
+                                                 target_size=target_size,
+                                                 seed=random_state)
         # Split validation data
-        val = datagen.flow_from_dataframe(cvtest,
-                                          x_col='imgpath',
-                                          y_col='classname',
-                                          target_size=target_size,
-                                          seed=random_state)
+        val = testdatagen.flow_from_dataframe(cvtest,
+                                              x_col='imgpath',
+                                              y_col='classname',
+                                              target_size=target_size,
+                                              seed=random_state)
         # Fit model
         model.fit(train,
                   epochs=epochs,
