@@ -10,3 +10,4 @@ data/validation_predictions/
 *.docx
 notebooks/Modeling_new-Copy1.ipynb
 notebooks/Modeling-archive.ipynb
+data/weights/
