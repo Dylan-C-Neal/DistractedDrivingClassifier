@@ -5,3 +5,8 @@ data/raw/imgs/
 .idea/
 notebooks/Experimentation.ipynb
 functions/__pycache__/
+data/predictions/
+data/validation_predictions/
+*.docx
+notebooks/Modeling_new-Copy1.ipynb
+notebooks/Modeling-archive.ipynb
