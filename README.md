@@ -1,4 +1,6 @@
-# Distracted Driving Classifier - VGG16 Transfer Learning
+# Distracted Driving Classifier - VGG16 Transfer Learning<br>
+<b>Dylan Neal</b><br>
+<b>January, 2021</b>
 ### CONTEXT
 
 According to the CDC, ~8 people are killed in the USA each day in crashes reported to involve a
